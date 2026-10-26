@@ -83,3 +83,68 @@ test('6. admin dapat mengakses /admin/dashboard dengan sukses dan melihat statis
     $response->assertSee('Statistik Pengguna');
     $response->assertSee('Total Pengguna');
 });
+
+test('7. admin dapat melihat daftar pengguna pada dashboard admin', function () {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $user = User::factory()->create(['name' => 'Peserta Uji Coba', 'role' => 'user']);
+
+    $response = $this->actingAs($admin)->get('/admin/dashboard');
+
+    $response->assertStatus(200);
+    $response->assertSee('Daftar Pengguna');
+    $response->assertSee('Peserta Uji Coba');
+});
+
+test('8. admin dapat mengubah role pengguna lain', function () {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $targetUser = User::factory()->create(['role' => 'user']);
+
+    $response = $this->actingAs($admin)->patch("/admin/users/{$targetUser->id}/role", [
+        'role' => 'admin',
+    ]);
+
+    $response->assertRedirect(route('admin.dashboard'));
+    expect($targetUser->fresh()->role)->toBe('admin');
+});
+
+test('9. admin dapat menghapus pengguna lain', function () {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $targetUser = User::factory()->create(['role' => 'user']);
+
+    $response = $this->actingAs($admin)->delete("/admin/users/{$targetUser->id}");
+
+    $response->assertRedirect(route('admin.dashboard'));
+    expect(User::find($targetUser->id))->toBeNull();
+});
+
+test('10. admin tidak dapat menghapus akunnya sendiri', function () {
+    $admin = User::factory()->create(['role' => 'admin']);
+
+    $response = $this->actingAs($admin)->delete("/admin/users/{$admin->id}");
+
+    $response->assertRedirect(route('admin.dashboard'));
+    $response->assertSessionHas('error');
+    expect(User::find($admin->id))->not->toBeNull();
+});
+
+test('11. user biasa tidak dapat mengubah role pengguna lain', function () {
+    $user = User::factory()->create(['role' => 'user']);
+    $targetUser = User::factory()->create(['role' => 'user']);
+
+    $response = $this->actingAs($user)->patch("/admin/users/{$targetUser->id}/role", [
+        'role' => 'admin',
+    ]);
+
+    $response->assertStatus(403);
+    expect($targetUser->fresh()->role)->toBe('user');
+});
+
+test('12. user biasa tidak dapat menghapus pengguna lain', function () {
+    $user = User::factory()->create(['role' => 'user']);
+    $targetUser = User::factory()->create(['role' => 'user']);
+
+    $response = $this->actingAs($user)->delete("/admin/users/{$targetUser->id}");
+
+    $response->assertStatus(403);
+    expect(User::find($targetUser->id))->not->toBeNull();
+});
